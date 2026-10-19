@@ -1,0 +1,24 @@
+<div class="page-width">
+  <h2>Liquid practice</h2>
+  <ul>
+    {% for product in collections.all.products limit: 6 %}
+      <li>
+        {{ forloop.index }}. {{ product.title | upcase }} - {{ product.price | money }}
+
+        {% if product.compare_at_price > product.price %}
+          {% assign saved = product.compare_at_price | minus: product.price %}
+          {% assign percent = saved | times: 100.0 | divided_by: product.compare_at_price | round %}
+          <strong style="color: red;">SALE -{{ percent }}%</strong>
+          <s>{{ product.compare_at_price | money }}</s>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+
+{% schema %}
+{
+  "name": "Liquid practice",
+  "presets": [{ "name": "Liquid practice" }]
+}
+{% endschema %}
