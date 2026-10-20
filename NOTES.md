@@ -59,3 +59,44 @@
 2. Change content and options in the theme editor, then click **Save**
 3. Before stopping, run `shopify theme pull` so editor changes land in my local files
 4. Commit and push
+
+# Shopify Theme Practice (Dawn)
+
+A practice project where I learn Shopify theme development by customizing Dawn, Shopify's reference theme. I'm using it to build my Liquid, section, and theme workflow skills.
+
+## What I built
+
+- **Percent-off sale badge:** customized Dawn's product card (`snippets/card-product.liquid`) so sale items show "Sale -X%" instead of just "Sale"
+- **Promo banner section:** a custom section with editable heading, subtext, button, and colors
+- **Hero carousel section:** a fade carousel built with blocks, with editor settings for:
+  - Slides (image, heading, subtext, button)
+  - Banner height, autoplay, speed, and fade duration
+  - Fonts, sizes, and alignment
+  - Separate heading, subtext, and overlay colors
+  - Button style (solid or outline) and shape
+
+## Tech
+
+- Shopify CLI
+- Liquid
+- HTML, CSS, and vanilla JavaScript
+- Dawn theme (Online Store 2.0)
+
+## Run it locally
+
+1. Install Node.js and the Shopify CLI: `npm install -g @shopify/cli@latest`
+2. Clone this repo and `cd` into it
+3. Run: `shopify theme dev --store [your-store].myshopify.com`
+4. Open the preview link it prints
+
+## What I learned
+
+- How a Shopify theme is put together (layout, templates, sections, snippets)
+- Liquid objects, tags, and filters
+- Schema settings and blocks for editor-friendly sections
+- Building a fade carousel with CSS transitions and a little JavaScript
+- Working with the CLI and the theme editor together
+
+## Screenshots
+
+## Live demo

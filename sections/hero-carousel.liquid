@@ -1,0 +1,480 @@
+{%- liquid
+  assign heading_font = section.settings.heading_font
+  assign body_font = section.settings.body_font
+  assign overlay_alpha = section.settings.overlay_opacity | divided_by: 100.0
+  assign overlay_bg = section.settings.overlay_color | color_modify: 'alpha', overlay_alpha
+-%}
+
+{%- style -%}
+  {{ heading_font | font_face: font_display: 'swap' }}
+  {{ body_font | font_face: font_display: 'swap' }}
+
+  #HeroCarousel-{{ section.id }} {
+    --hc-heading-color: {{ section.settings.heading_color }};
+    --hc-subtext-color: {{ section.settings.subtext_color }};
+    --hc-overlay: {{ overlay_bg }};
+    --hc-btn-bg: {{ section.settings.button_bg }};
+    --hc-btn-text: {{ section.settings.button_text }};
+    --hc-fade: {{ section.settings.fade_duration }}ms;
+    --hc-heading-size: {{ section.settings.heading_size }}px;
+    --hc-text-size: {{ section.settings.text_size }}px;
+  }
+
+  #HeroCarousel-{{ section.id }} .hero-carousel__heading {
+    font-family: {{ heading_font.family }}, {{ heading_font.fallback_families }};
+    font-weight: {{ heading_font.weight }};
+    font-style: {{ heading_font.style }};
+  }
+
+  #HeroCarousel-{{ section.id }} .hero-carousel__text,
+  #HeroCarousel-{{ section.id }} .hero-carousel__button {
+    font-family: {{ body_font.family }}, {{ body_font.fallback_families }};
+    font-weight: {{ body_font.weight }};
+    font-style: {{ body_font.style }};
+  }
+{%- endstyle -%}
+
+<div
+  class="hero-carousel hero-carousel--{{ section.settings.height }} hero-carousel--align-{{ section.settings.text_align }} hero-carousel--btn-{{ section.settings.button_style }} hero-carousel--shape-{{ section.settings.button_shape }}"
+  id="HeroCarousel-{{ section.id }}"
+  data-autoplay="{{ section.settings.autoplay }}"
+  data-speed="{{ section.settings.autoplay_speed }}"
+>
+  <div class="hero-carousel__track">
+    {%- for block in section.blocks -%}
+      <div
+        class="hero-carousel__slide{% if forloop.first %} is-active{% endif %}"
+        aria-hidden="{% if forloop.first %}false{% else %}true{% endif %}"
+        {{ block.shopify_attributes }}
+      >
+        {%- if block.settings.image != blank -%}
+          {{ block.settings.image | image_url: width: 1600 | image_tag: class: 'hero-carousel__image' }}
+        {%- else -%}
+          {{ 'hero-apparel-1' | placeholder_svg_tag: 'hero-carousel__image' }}
+        {%- endif -%}
+
+        <div class="hero-carousel__content">
+          {%- if block.settings.heading != blank -%}
+            <h2 class="hero-carousel__heading">{{ block.settings.heading }}</h2>
+          {%- endif -%}
+          {%- if block.settings.subtext != blank -%}
+            <p class="hero-carousel__text">{{ block.settings.subtext }}</p>
+          {%- endif -%}
+          {%- if block.settings.button_label != blank -%}
+            <a href="{{ block.settings.button_link }}" class="hero-carousel__button">
+              {{- block.settings.button_label -}}
+            </a>
+          {%- endif -%}
+        </div>
+      </div>
+    {%- endfor -%}
+  </div>
+
+  {%- if section.blocks.size > 1 -%}
+    <button type="button" class="hero-carousel__arrow hero-carousel__arrow--prev" data-prev aria-label="Previous slide">
+      &#8249;
+    </button>
+    <button type="button" class="hero-carousel__arrow hero-carousel__arrow--next" data-next aria-label="Next slide">
+      &#8250;
+    </button>
+    {%- if section.settings.show_dots -%}
+      <div class="hero-carousel__dots" data-dots></div>
+    {%- endif -%}
+  {%- endif -%}
+</div>
+
+<script>
+  (() => {
+    const root = document.getElementById('HeroCarousel-{{ section.id }}');
+    if (!root) return;
+
+    const slides = Array.from(root.querySelectorAll('.hero-carousel__slide'));
+    const prev = root.querySelector('[data-prev]');
+    const next = root.querySelector('[data-next]');
+    const dotsBox = root.querySelector('[data-dots]');
+
+    let current = 0;
+    let timer = null;
+
+    // Build one dot per slide
+    const dots = dotsBox
+      ? slides.map((_, i) => {
+          const dot = document.createElement('button');
+          dot.type = 'button';
+          dot.className = 'hero-carousel__dot';
+          dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+          dot.addEventListener('click', () => {
+            show(i);
+            restart();
+          });
+          dotsBox.appendChild(dot);
+          return dot;
+        })
+      : [];
+
+    // Show one slide: the CSS handles the fade
+    const show = (index) => {
+      current = (index + slides.length) % slides.length;
+      slides.forEach((slide, i) => {
+        const active = i === current;
+        slide.classList.toggle('is-active', active);
+        slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+      });
+      dots.forEach((dot, i) => dot.classList.toggle('is-active', i === current));
+    };
+
+    // Autoplay
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const canAutoplay = root.dataset.autoplay === 'true' && !reducedMotion && slides.length > 1;
+    const delay = (parseInt(root.dataset.speed, 10) || 5) * 1000;
+
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
+    const start = () => {
+      if (!canAutoplay) return;
+      stop();
+      timer = setInterval(() => show(current + 1), delay);
+    };
+    const restart = () => start();
+
+    if (prev)
+      prev.addEventListener('click', () => {
+        show(current - 1);
+        restart();
+      });
+    if (next)
+      next.addEventListener('click', () => {
+        show(current + 1);
+        restart();
+      });
+
+    // Pause while hovering or focused
+    root.addEventListener('mouseenter', stop);
+    root.addEventListener('mouseleave', start);
+    root.addEventListener('focusin', stop);
+    root.addEventListener('focusout', start);
+
+    // In the theme editor: jump to the slide being edited and pause
+    root.addEventListener('shopify:block:select', (event) => {
+      const i = slides.indexOf(event.target);
+      if (i > -1) {
+        show(i);
+        stop();
+      }
+    });
+    root.addEventListener('shopify:block:deselect', start);
+
+    show(0);
+    start();
+  })();
+</script>
+
+{% stylesheet %}
+  .hero-carousel {
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* All slides stack in the same grid cell, and only the active one is visible */
+  .hero-carousel__track {
+    display: grid;
+  }
+  .hero-carousel__slide {
+    grid-area: 1 / 1;
+    position: relative;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--hc-fade) ease, visibility 0s linear var(--hc-fade);
+  }
+  .hero-carousel__slide.is-active {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity var(--hc-fade) ease, visibility 0s;
+  }
+
+  /* Heights: mobile first, bigger on desktop */
+  .hero-carousel--small .hero-carousel__slide {
+    min-height: 28rem;
+  }
+  .hero-carousel--medium .hero-carousel__slide {
+    min-height: 34rem;
+  }
+  .hero-carousel--large .hero-carousel__slide {
+    min-height: 39rem;
+  }
+
+  @media screen and (min-width: 750px) {
+    .hero-carousel--small .hero-carousel__slide {
+      min-height: 40rem;
+    }
+    .hero-carousel--medium .hero-carousel__slide {
+      min-height: 56rem;
+    }
+    .hero-carousel--large .hero-carousel__slide {
+      min-height: 72rem;
+    }
+  }
+
+  .hero-carousel__image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .hero-carousel__content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1.6rem;
+    padding: 8rem 5rem 3rem;
+    text-align: center;
+    background: var(--hc-overlay);
+  }
+  .hero-carousel--align-left .hero-carousel__content {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .hero-carousel--align-right .hero-carousel__content {
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .hero-carousel__heading {
+    margin: 0;
+    color: var(--hc-heading-color);
+    font-size: calc(var(--hc-heading-size) * 0.6);
+    line-height: 1.15;
+  }
+  .hero-carousel__text {
+    margin: 0;
+    color: var(--hc-subtext-color);
+    font-size: calc(var(--hc-text-size) * 0.9);
+  }
+  @media screen and (min-width: 750px) {
+    .hero-carousel__heading {
+      font-size: var(--hc-heading-size);
+    }
+    .hero-carousel__text {
+      font-size: var(--hc-text-size);
+    }
+  }
+
+  /* Button */
+  .hero-carousel__button {
+    display: inline-block;
+    padding: 1.2rem 2.8rem;
+    border: 2px solid var(--hc-btn-bg);
+    border-radius: 0;
+    background: var(--hc-btn-bg);
+    color: var(--hc-btn-text);
+    text-decoration: none;
+    font-size: 1.6rem;
+    cursor: pointer;
+    transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  }
+  .hero-carousel__button:hover {
+    opacity: 0.85;
+  }
+  .hero-carousel--shape-rounded .hero-carousel__button {
+    border-radius: 0.8rem;
+  }
+  .hero-carousel--shape-pill .hero-carousel__button {
+    border-radius: 999px;
+  }
+  .hero-carousel--btn-outline .hero-carousel__button {
+    background: transparent;
+    color: var(--hc-btn-bg);
+  }
+  .hero-carousel--btn-outline .hero-carousel__button:hover {
+    opacity: 1;
+    background: var(--hc-btn-bg);
+    color: var(--hc-btn-text);
+  }
+
+  /* Arrows and dots */
+  /* .hero-carousel__arrow {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    transform: translateY(-50%);
+    width: 4rem;
+    height: 4rem;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8);
+    font-size: 2.4rem;
+    cursor: pointer;
+  }
+  .hero-carousel__arrow--prev {
+    left: 1rem;
+  }
+  .hero-carousel__arrow--next {
+    right: 1rem;
+  } */
+
+  .hero-carousel__dots {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 1.5rem;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    gap: 0.8rem;
+  }
+  .hero-carousel__dot {
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+  }
+  .hero-carousel__dot.is-active {
+    background: #fff;
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Hero carousel",
+  "max_blocks": 5,
+  "settings": [
+    {
+      "type": "select",
+      "id": "height",
+      "label": "Banner height",
+      "options": [
+        { "value": "small", "label": "Small" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "large", "label": "Large" }
+      ],
+      "default": "medium"
+    },
+    { "type": "checkbox", "id": "autoplay", "label": "Autoplay slides", "default": true },
+    {
+      "type": "range",
+      "id": "autoplay_speed",
+      "label": "Change slides every",
+      "min": 3,
+      "max": 10,
+      "step": 1,
+      "unit": "s",
+      "default": 5
+    },
+    {
+      "type": "range",
+      "id": "fade_duration",
+      "label": "Fade speed",
+      "min": 300,
+      "max": 2000,
+      "step": 100,
+      "unit": "ms",
+      "default": 800
+    },
+    { "type": "checkbox", "id": "show_dots", "label": "Show dots", "default": true },
+
+    { "type": "header", "content": "Typography" },
+    { "type": "font_picker", "id": "heading_font", "label": "Heading font", "default": "assistant_n7" },
+    { "type": "font_picker", "id": "body_font", "label": "Text and button font", "default": "assistant_n4" },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "label": "Heading size",
+      "min": 24,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "range",
+      "id": "text_size",
+      "label": "Text size",
+      "min": 14,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "default": 18
+    },
+    {
+      "type": "select",
+      "id": "text_align",
+      "label": "Text alignment",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" },
+        { "value": "right", "label": "Right" }
+      ],
+      "default": "center"
+    },
+
+    { "type": "header", "content": "Colors" },
+    { "type": "color", "id": "heading_color", "label": "Heading color", "default": "#ffffff" },
+    { "type": "color", "id": "subtext_color", "label": "Subtext color", "default": "#ffffff" },
+    { "type": "color", "id": "overlay_color", "label": "Overlay color", "default": "#000000" },
+    {
+      "type": "range",
+      "id": "overlay_opacity",
+      "label": "Overlay opacity",
+      "min": 0,
+      "max": 80,
+      "step": 5,
+      "unit": "%",
+      "default": 30
+    },
+
+    { "type": "header", "content": "Button" },
+    {
+      "type": "select",
+      "id": "button_style",
+      "label": "Button style",
+      "options": [
+        { "value": "solid", "label": "Solid" },
+        { "value": "outline", "label": "Outline" }
+      ],
+      "default": "solid"
+    },
+    {
+      "type": "select",
+      "id": "button_shape",
+      "label": "Button shape",
+      "options": [
+        { "value": "square", "label": "Square" },
+        { "value": "rounded", "label": "Rounded" },
+        { "value": "pill", "label": "Pill" }
+      ],
+      "default": "rounded"
+    },
+    { "type": "color", "id": "button_bg", "label": "Button color", "default": "#ffffff" },
+    { "type": "color", "id": "button_text", "label": "Button text color", "default": "#000000" }
+  ],
+  "blocks": [
+    {
+      "type": "slide",
+      "name": "Slide",
+      "settings": [
+        { "type": "image_picker", "id": "image", "label": "Image" },
+        { "type": "text", "id": "heading", "label": "Heading", "default": "Slide heading" },
+        { "type": "text", "id": "subtext", "label": "Subtext", "default": "A short line about this slide" },
+        { "type": "text", "id": "button_label", "label": "Button label", "default": "Shop now" },
+        { "type": "url", "id": "button_link", "label": "Button link" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Hero carousel",
+      "blocks": [{ "type": "slide" }, { "type": "slide" }]
+    }
+  ]
+}
+{% endschema %}
